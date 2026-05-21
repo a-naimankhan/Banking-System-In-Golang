@@ -20,7 +20,6 @@ func setupTestDB(t *testing.T) *gorm.DB {
 		t.Fatalf("Failed to connect to test database: %v", err)
 	}
 
-	// Очищаем таблицы перед тестом, чтобы старые данные не мешали
 	db.Migrator().DropTable(&domain.Account{}, &domain.SavingAccount{})
 	db.AutoMigrate(&domain.Account{}, &domain.SavingAccount{})
 
@@ -30,7 +29,6 @@ func TestPostgresTransfer(t *testing.T) {
 	db := setupTestDB(t)
 	repo := postgres.NewAccountRepo(db)
 
-	// 1. Создаем тестовые данные
 	accA := &domain.Account{ID: "101", Owner: "TestUser1", Balance: 1000}
 	accB := &domain.Account{ID: "102", Owner: "TestUser2", Balance: 1000}
 
@@ -39,7 +37,6 @@ func TestPostgresTransfer(t *testing.T) {
 
 	initialTotal := accA.Balance + accB.Balance // 2000
 
-	// 2. Функция для выполнения трансфера в транзакции
 	transfer := func(amount float32) error {
 		txRepo, err := repo.BeginTx()
 		if err != nil {
@@ -82,7 +79,6 @@ func TestPostgresTransfer(t *testing.T) {
 		return nil
 	}
 
-	// 3. Запускаем 20 конкурентных трансферов по 100
 	var wg sync.WaitGroup
 	numGoroutines := 20
 	amount := float32(100)
@@ -99,7 +95,6 @@ func TestPostgresTransfer(t *testing.T) {
 
 	wg.Wait()
 
-	// 4. Проверка результата: общий капитал должен остаться 2000
 	finalA, _ := repo.GetByID("101")
 	finalB, _ := repo.GetByID("102")
 	finalTotal := finalA.Balance + finalB.Balance
@@ -108,7 +103,6 @@ func TestPostgresTransfer(t *testing.T) {
 		t.Errorf("Money leak detected! Initial total: %.2f, Final total: %.2f", initialTotal, finalTotal)
 	}
 
-	// Дополнительная проверка: A должно уменьшиться на 2000, B увеличиться на 2000
 	expectedA := 1000 - float32(numGoroutines)*amount
 	expectedB := 1000 + float32(numGoroutines)*amount
 
